@@ -3,69 +3,61 @@
 
 #include "pal_config.h"
 #include "pal_uid.h"
+#include "pal_utilities.h"
 
 #include <assert.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <pwd.h>
 
-/**
-* Gets a password structure for the given uid.
-* Implemented as shim to getpwuid_r(3).
-*
-* Returns 0 for success, -1 for failure. Sets errno on failure.
-*/
-extern "C"
-int32_t GetPwUidR(
-	int32_t  uid,
-	Passwd*  pwd,
-	char*    buf,
-	int64_t  buflen)
+extern "C" int32_t GetPwUidR(uint32_t uid, Passwd* pwd, char* buf, int32_t buflen)
 {
-	assert(pwd != nullptr);
-	assert(buf != nullptr);
-	assert(buflen >= 0);
+    assert(pwd != nullptr);
+    assert(buf != nullptr);
+    assert(buflen >= 0);
 
-	struct passwd nativePwd;
-	struct passwd* result;
-	int error = getpwuid_r(uid, &nativePwd, buf, buflen, &result);
+    if (buflen < 0)
+        return EINVAL;
 
-	// positive error number returned -> failure other than entry-not-found
-	if (error != 0)
-	{
-		assert(error > 0);
-		*pwd = { }; // managed out param must be initialized
-		return error;
-	}
+    struct passwd nativePwd;
+    struct passwd* result;
+    int error = getpwuid_r(uid, &nativePwd, buf, UnsignedCast(buflen), &result);
 
-	// 0 returned with null result -> entry-not-found
-	if (result == nullptr)
-	{
-		*pwd = { }; // managed out param must be initialized
-		return -1;  // shim convention for entry-not-found
-	}
+    // positive error number returned -> failure other than entry-not-found
+    if (error != 0)
+    {
+        assert(error > 0);
+        *pwd = {}; // managed out param must be initialized
+        return error;
+    }
 
-	// 0 returned with non-null result (guaranteed to be set to pwd arg) -> success
-	assert(result == &nativePwd);
-	pwd->Name = nativePwd.pw_name;
-	pwd->Password = nativePwd.pw_passwd;
-	pwd->UserId = nativePwd.pw_uid;
-	pwd->GroupId = nativePwd.pw_gid;
-	pwd->UserInfo = nativePwd.pw_gecos;
-	pwd->HomeDirectory = nativePwd.pw_dir;
-	pwd->Shell = nativePwd.pw_shell;
-	return 0;
+    // 0 returned with null result -> entry-not-found
+    if (result == nullptr)
+    {
+        *pwd = {}; // managed out param must be initialized
+        return -1; // shim convention for entry-not-found
+    }
+
+    // 0 returned with non-null result (guaranteed to be set to pwd arg) -> success
+    assert(result == &nativePwd);
+    pwd->Name = nativePwd.pw_name;
+    pwd->Password = nativePwd.pw_passwd;
+    pwd->UserId = nativePwd.pw_uid;
+    pwd->GroupId = nativePwd.pw_gid;
+    pwd->UserInfo = nativePwd.pw_gecos;
+    pwd->HomeDirectory = nativePwd.pw_dir;
+    pwd->Shell = nativePwd.pw_shell;
+    return 0;
 }
 
-extern "C"
-int32_t GetEUid()
+extern "C" uint32_t GetEUid()
 {
-	return geteuid();
+    return geteuid();
 }
 
-extern "C"
-int32_t GetEGid()
+extern "C" uint32_t GetEGid()
 {
-	return getegid();
+    return getegid();
 }

@@ -64,16 +64,22 @@ namespace System.IO.FileSystem.Tests
         public void CreationSetsAllTimes()
         {
             string path = GetTestFilePath();
-            long beforeTime = DateTime.UtcNow.AddSeconds(-3).Ticks;
+            DateTime beforeTime = DateTime.UtcNow.AddSeconds(-3);
 
             FileInfo testFile = new FileInfo(GetTestFilePath());
             testFile.Create().Dispose();
 
-            long afterTime = DateTime.UtcNow.AddSeconds(3).Ticks;
+            DateTime afterTime = DateTime.UtcNow.AddSeconds(3);
 
             Assert.All(TimeFunctions(), (tuple) =>
             {
-                Assert.InRange(tuple.Item2(testFile).ToUniversalTime().Ticks, beforeTime, afterTime);
+                // We want to test all possible DateTimeKind conversions to ensure they function as expected
+                if (tuple.Item3 == DateTimeKind.Utc)
+                    Assert.InRange(tuple.Item2(testFile).Ticks, beforeTime.Ticks, afterTime.Ticks);
+                else
+                    Assert.InRange(tuple.Item2(testFile).Ticks, beforeTime.ToLocalTime().Ticks, afterTime.ToLocalTime().Ticks);
+                Assert.InRange(tuple.Item2(testFile).ToLocalTime().Ticks, beforeTime.ToLocalTime().Ticks, afterTime.ToLocalTime().Ticks);
+                Assert.InRange(tuple.Item2(testFile).ToUniversalTime().Ticks, beforeTime.Ticks, afterTime.Ticks);
             });
         }
     }
